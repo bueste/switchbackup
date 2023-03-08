@@ -119,7 +119,7 @@ def establish_ssh_connection(connection):
         if HUAWEI_PORT: client.connect(connection['host'], username=connection['user'], port=HUAWEI_PORT, password=connection['pass'])
         else: client.connect(connection['host'], username=connection['user'], password=connection['pass'])
         shell = client.invoke_shell()
-    log_event("[CONNECTING SUCCESSFULL] [TIME TAKEN: {} sec]".format(round(time.time()-tick, 2)))
+    if shell: log_event("[CONNECTING SUCCESSFULL] [TIME TAKEN: {} sec]".format(round(time.time()-tick, 2)))
     return shell, client
 
 # %%
