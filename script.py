@@ -16,6 +16,9 @@ LOG_FILE = './service.log'
 SWITCH_NAME = re.compile("switch[\w]+#")
 BACKUP_DIR = './backups'
 
+CISCO_PORT = 55556
+HUAWEI_PORT = 0
+
 # %%
 def log_event(event):
     print(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: {event}")
@@ -39,7 +42,7 @@ def read_connect_file():
                 'alias'  : config[3],
                 'type'   : config[4],
                 'enable' : config[5],
-                'retention': config[6]
+                'retention': config[-1]
             } for config in  [line.strip().split() for line in f if not(line.strip().startswith('#'))]]
 
         return connect_info
@@ -101,7 +104,8 @@ def establish_ssh_connection(connection):
     tick = time.time()
     if 'cisco' in connection['alias']:
         try:
-            client.connect(connection['host'], username=connection['user'], port=55556, password=connection['pass'])
+            if CISCO_PORT: client.connect(connection['host'], username=connection['user'], port=CISCO_PORT, password=connection['pass'])
+            else: client.connect(connection['host'], username=connection['user'], password=connection['pass'])
         except paramiko.AuthenticationException:
             client.get_transport().auth_none(connection['user'])
             shell = client.invoke_shell()
@@ -112,7 +116,8 @@ def establish_ssh_connection(connection):
             log_event(f"[SENDING MAIL] ......")
             send_email(connection)
     else:
-        client.connect(connection['host'], username=connection['user'], password=connection['pass'])
+        if HUAWEI_PORT: client.connect(connection['host'], username=connection['user'], port=HUAWEI_PORT, password=connection['pass'])
+        else: client.connect(connection['host'], username=connection['user'], password=connection['pass'])
         shell = client.invoke_shell()
     log_event("[CONNECTING SUCCESSFULL] [TIME TAKEN: {} sec]".format(round(time.time()-tick, 2)))
     return shell, client
@@ -127,19 +132,24 @@ def sanitize_data(data):
 # %%
 def get_running_config(shell, alias):
     response = ""
-    config_command = 'show running-config\n' if 'cisco' in alias else 'display current-configuration all\n'
-    shell.send(config_command)
-    data = shell.recv(8000).decode("utf-8")
-    response += data
-    flag = 0
-    while True:
-        shell.send(' ')
+    try:
+        config_command = 'show running-config\n' if 'cisco' in alias else 'display current-configuration all\n'
+        shell.send(config_command)
         data = shell.recv(8000).decode("utf-8")
         response += data
-        if SWITCH_NAME.search(data): flag += 1
-        if ('cisco' not in alias and 'return' in data) or \
-           ('cisco' in alias and flag > 1):
-            break
+        flag = 0
+        while True:
+            shell.send(' ')
+            data = shell.recv(8000).decode("utf-8")
+            response += data
+            if SWITCH_NAME.search(data): flag += 1
+            if ('cisco' not in alias and 'return' in data) or \
+            ('cisco' in alias and flag > 1):
+                break
+    except Exception as e:
+        log_event(f"[EXCEPTION] Unable to get the running configurations: {connection['host']}, {e}")
+        log_event(f"[SENDING MAIL] ......")
+        send_email(connection)
     return sanitize_data(response)
 
 # %%
