@@ -40,11 +40,11 @@ def read_connect_file():
                 'type'   : config[4],
                 'enable' : config[5],
                 'retention': config[6]
-            } for config in  [line.strip().split(' ') for line in f if not(line.strip().startswith('#'))]]
+            } for config in  [line.strip().split() for line in f if not(line.strip().startswith('#'))]]
 
         return connect_info
     except Exception as e:
-        log_event(f"{CONNECT_CONFIG} not found, [Exception]: ", e)
+        log_event(f"{CONNECT_CONFIG} not found, [Exception]: "+str(e))
         sys.exit(1)
 
 # %%
